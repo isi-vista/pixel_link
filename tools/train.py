@@ -85,8 +85,8 @@ def config_initialization():
                        num_gpus = FLAGS.num_gpus
                    )
 
-    batch_size = config.batch_size
-    batch_size_per_gpu = config.batch_size_per_gpu
+    batch_size = int(config.batch_size)
+    batch_size_per_gpu = int(config.batch_size_per_gpu)
         
     tf.summary.scalar('batch_size', batch_size)
     tf.summary.scalar('batch_size_per_gpu', batch_size_per_gpu)
@@ -148,7 +148,7 @@ def create_dataset_batch_queue(dataset):
                 tf.train.batch(
                     [image, pixel_cls_label, pixel_cls_weight, 
                         pixel_link_label, pixel_link_weight],
-                    batch_size = config.batch_size_per_gpu,
+                    batch_size = int(config.batch_size_per_gpu),
                     num_threads= FLAGS.num_preprocessing_threads,
                     capacity = 500)
         with tf.name_scope(FLAGS.dataset_name + '_prefetch_queue'):
@@ -274,7 +274,8 @@ def train(train_op):
             log_every_n_steps = FLAGS.log_every_n_steps,
             save_summaries_secs = 30,
             saver = saver,
-            save_interval_secs = 1200,
+            #save_interval_secs = 1200,
+            save_interval_secs = 300,
             session_config = sess_config
     )
 

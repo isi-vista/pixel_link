@@ -244,7 +244,7 @@ class PixelLinkNet(object):
         
         def OHNM_batch(neg_conf, pos_mask, neg_mask):
             selected_neg_mask = []
-            for image_idx in xrange(batch_size):
+            for image_idx in range(int(batch_size)):
                 image_neg_conf = neg_conf[image_idx, :]
                 image_neg_mask = neg_mask[image_idx, :]
                 image_pos_mask = pos_mask[image_idx, :]
@@ -255,8 +255,8 @@ class PixelLinkNet(object):
             return selected_neg_mask
         
         # OHNM on pixel classification task
-        pixel_cls_labels_flatten = tf.reshape(pixel_cls_labels, [batch_size, -1])
-        pos_pixel_weights_flatten = tf.reshape(pixel_cls_weights, [batch_size, -1])
+        pixel_cls_labels_flatten = tf.reshape(pixel_cls_labels, [int(batch_size), -1])
+        pos_pixel_weights_flatten = tf.reshape(pixel_cls_weights, [int(batch_size), -1])
         
         pos_mask = tf.equal(pixel_cls_labels_flatten, text_label)
         neg_mask = tf.equal(pixel_cls_labels_flatten, background_label)

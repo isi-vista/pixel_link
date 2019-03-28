@@ -184,8 +184,8 @@ def cal_gt_for_single_image(normed_xs, normed_ys, labels):
                 per_pixel_weight = per_bbox_weight / num_bbox_pixels
                 pixel_cls_weight += bbox_positive_pixel_mask * per_pixel_weight
         else:
-            raise ValueError, 'pixel_cls_weight_method not supported:%s'\
-                        %(pixel_cls_weight_method)
+            raise( ValueError, 'pixel_cls_weight_method not supported:%s'\
+                        %(pixel_cls_weight_method) )
 
     
         ## calculate the labels and weights of links
@@ -254,7 +254,8 @@ def decode_batch(pixel_cls_scores, pixel_link_scores,
     
     batch_size = pixel_cls_scores.shape[0]
     batch_mask = []
-    for image_idx in xrange(batch_size):
+#    for image_idx in xrange(batch_size):
+    for image_idx in range(batch_size):
         image_pos_pixel_scores = pixel_cls_scores[image_idx, :, :]
         image_pos_link_scores = pixel_link_scores[image_idx, :, :, :]    
         mask = decode_image(
@@ -277,7 +278,7 @@ def decode_image(pixel_scores, link_scores,
         return decode_image_by_border(pixel_scores, link_scores, 
                  pixel_conf_threshold, link_conf_threshold)
     else:
-        raise ValueError('Unknow decode method:%s'%(config.decode_method))
+        raise( ValueError('Unknow decode method:%s'%(config.decode_method)) )
 
 
 import pyximport; pyximport.install()    
@@ -319,7 +320,7 @@ def rect_to_xys(rect, image_shape):
         return y
     
     rect = ((rect[0], rect[1]), (rect[2], rect[3]), rect[4])
-    points = cv2.cv.BoxPoints(rect)
+    points = cv2.boxPoints(rect)
     points = np.int0(points)
     for i_xy, (x, y) in enumerate(points):
         x = get_valid_x(x)
@@ -345,12 +346,13 @@ def mask_to_bboxes(mask, image_shape =  None, min_area = None,
         
     if min_height is None:
         min_height = config.min_height
-    bboxes = []
     max_bbox_idx = mask.max()
     mask = util.img.resize(img = mask, size = (image_w, image_h), 
                            interpolation = cv2.INTER_NEAREST)
     
-    for bbox_idx in xrange(1, max_bbox_idx + 1):
+    bboxes = []
+#    for bbox_idx in xrange(1, max_bbox_idx + 1):
+    for bbox_idx in range(1, max_bbox_idx + 1):
         bbox_mask = mask == bbox_idx
 #         if bbox_mask.sum() < 10:
 #             continue
@@ -366,13 +368,125 @@ def mask_to_bboxes(mask, image_shape =  None, min_area = None,
         
         if rect_area < min_area:
             continue
-        
+
 #         if max(w, h) * 1.0 / min(w, h) < 2:
 #             continue
         xys = rect_to_xys(rect, image_shape)
+
         bboxes.append(xys)
-        
+
     return bboxes
 
+def bboxes_to_lines( bboxes ):
+    group_mask = {}
+    for box in bboxes:
+        group_mask[tuple(box)] = -1
+
+    def find_parent(box):
+        return group_mask[tuple(box)]
+
+    def set_parent(box, parent):
+        group_mask[tuple(box)] = tuple(parent)
+
+    def is_root(box):
+        return find_parent(box) == -1
+
+    def find_root(box):
+        root = box
+        update_parent = False
+        while not is_root(root):
+            root = find_parent(root)
+            update_parent = True
+        if update_parent:
+            set_parent(box, root)
+        return root
+
+    def join(box1, box2):
+        root1 = find_root(box1)
+        root2 = find_root(box2)
+
+        if tuple(root1) != tuple(root2):
+            set_parent(root1, root2)
+
+    def merge_boxes( bboxes, dist ):
+        for id1 in range(len(bboxes)-1):
+            for id2 in range(id1, len(bboxes)):
+                if is_neighbor(bboxes[id1], bboxes[id2], dist):
+                    join(bboxes[id1], bboxes[id2])
+
+        # get merged lines 
+        root_map = {}
+        group = {}
+        def get_index(root):
+            if tuple(root) not in root_map:
+                root_map[tuple(root)] = len(root_map)+1
+            return root_map[tuple(root)]
+
+        for box in bboxes:
+            root = find_root(box)
+            idx = get_index(root)
+            group[tuple(box)] = idx 
+
+        line_group = {}
+        for box in group:
+            if group[box] in line_group:
+                line_group[group[box]] += list(box)
+            else:
+                line_group[group[box]] = list(box)
+
+        lines = []
+        for id in line_group:
+            minx = np.min(line_group[id][::2])
+            maxx = np.max(line_group[id][::2])
+            miny = np.min(line_group[id][1::2])
+            maxy = np.max(line_group[id][1::2])
+            lines.append([minx, maxy, minx, miny, maxx, miny, maxx, maxy])
+
+        return lines
+
+    def is_neighbor(box1, box2, dist):
+        x1 = box1[0:8:2]
+        x2 = box2[0:8:2]
+
+        l1 = np.min(x1)
+        r1 = np.max(x1)
+        l2 = np.min(x2)
+        r2 = np.max(x2)
+
+        if np.abs(l1-r2) > dist and np.abs(l2-r1) > dist:
+            return False
+
+        # check height overlap ratio
+        y1 = box1[1:9:2]
+        y2 = box2[1:9:2]
+
+        t1 = np.min(y1)
+        b1 = np.max(y1)
+        t2 = np.min(y2)
+        b2 = np.max(y2)
+
+        h1 = b1 - t1
+        h2 = b2 - t2
+
+        if (b2-t1)>0 and (b1-t2)>0:
+            o = h1 + h2 - (np.maximum(b1, b2) - np.minimum(t1, t2))
+            if float(o) / np.minimum(h1, h2) > 0.5:
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def mid_box_width(bboxes):
+        widths = []
+        for box in bboxes:
+            x = box[0:8:2]
+            widths.append(np.max(x) - np.min(x))
+         
+        return np.median(widths)
+
+    dx = mid_box_width(bboxes)
+
+    return merge_boxes( bboxes, dx )    
 
 #============================Decode End===============================

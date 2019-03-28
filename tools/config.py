@@ -117,7 +117,7 @@ def _set_image_shape(shape):
     assert h % 4 == 0
     
     train_image_shape = [h, w]
-    score_map_shape = (h / strides[0], w / strides[0])
+    score_map_shape = (int(h / strides[0]), int(w / strides[0]))
     image_shape = train_image_shape
 
 def _set_batch_size(bz):
@@ -154,7 +154,7 @@ def init_config(image_shape, batch_size = 1,
     num_clones = len(gpus)
     
     global clone_scopes
-    clone_scopes = ['clone_%d'%(idx) for idx in xrange(num_clones)]
+    clone_scopes = ['clone_%d'%(idx) for idx in range(num_clones)]
     
     _set_batch_size(batch_size)
     
@@ -222,5 +222,5 @@ def load_config(path):
     if util.io.exists(config_file):
         tf.logging.info('loading config.py from %s'%(config_file))
         config = util.mod.load_mod_from_path(config_file)
-    else:
-        util.io.copy('config.py', path)
+    #else:
+    #    util.io.copy('config.py', path)
